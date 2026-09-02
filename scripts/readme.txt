@@ -15,14 +15,16 @@ CSV:
 
 2. CSV Format
 
-DATE,SIZE_MB
-260901,10000
-260902,500
+DATE,HOSTNAME,SIZE_MB
+260901,ldap01,10000
+260902,ldap01,500
+...
 
 
 3. Crontab
 
-Run every day at 23:59.
+Run the script once a day at the preferred time.
+The script processes the previous day's access logs.
 
 
 4. Environment Change
@@ -40,7 +42,7 @@ Change LOG_DIR and SAVE_DIR for another environment.
 
 6. Cleanup
 
-Delete the previous year CSV files on January 1.
+Delete the previous year CSV files on January 2.
 
 ==========================
 
@@ -50,6 +52,6 @@ chmod +x /LDAP/access_size_check.sh
 
 crontab -e
 
-59 23 * * * /LDAP/access_size_check.sh
+0 4 * * * /LDAP/access_size_check.sh
 
 crontab -l

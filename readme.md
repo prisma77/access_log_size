@@ -1,36 +1,16 @@
 # LDAP Access Log Size Collector
 
-A Bash script that calculates the total size of the previous day's LDAP access logs and stores the result in a monthly CSV file.
+A Bash script that collects the size and count of previous-day LDAP access log files and saves the results to a monthly CSV file.
 
-## Features
+Diagnostic logs record the files checked, collected sizes, and errors.
 
-- Processes the previous day's rotated access logs
-- Calculates log sizes in bytes before converting to MB
-- Adds the hostname to each CSV record
-- Creates a separate CSV file for each month and hostname
-- Appends one daily record to the monthly CSV file
-- Automatically creates a new CSV file when the month changes
-- Deletes the previous year's CSV files on January 2
-- Runs automatically with Cron or Crond
-- Supports a user-defined daily execution time
+## Requirements
 
-## Log File Format
-
-The script processes rotated access logs with the following filename format:
-
-```text
-access.YYYYMMDD-HHMMSS
-```
-
-Example:
-
-```text
-access.20260901-000000
-access.20260901-000500
-access.20260901-001000
-```
-
-The active `access` file is not included because it can contain records from the current day.
+- Linux with Bash
+- GNU Coreutils and GNU Findutils
+- Cron for scheduled execution
+- Permission to list and access the log directory
+- Write permission for the output directory
 
 ## Configuration
 
@@ -41,216 +21,126 @@ LOG_DIR="/LDAP/log"
 SAVE_DIR="/LDAP/size"
 ```
 
-- `LOG_DIR`: Directory containing the LDAP access logs
-- `SAVE_DIR`: Directory where monthly CSV files are stored
-
-The script automatically gets the short hostname using:
-
-```bash
-hostname -s
-```
-
-## Output File
-
-CSV filename format:
+The script selects files matching:
 
 ```text
-YYMM_hostname.csv
+access.YYYYMMDD-*
 ```
 
-Example:
+`YYYYMMDD` is the previous day's date. The active `access` file is excluded.
 
-```text
-2609_ldap01.csv
-```
-
-CSV content:
-
-```csv
-DATE,HOSTNAME,SIZE_MB
-260901,ldap01,10000
-260902,ldap01,500
-260903,ldap01,11527
-```
-
-- `DATE`: Date of the processed access logs
-- `HOSTNAME`: Short hostname of the server
-- `SIZE_MB`: Total log size converted to integer MB
-
-`SIZE_MB` is calculated using `1024 × 1024` bytes and stored as an integer.
+Selection is based on filenames, not timestamps inside the logs. A rotated file may contain records from more than one day.
 
 ## Installation
 
-Clone the repository:
-
 ```bash
 git clone https://github.com/prisma77/access_log_size.git
-```
-
-Move to the repository:
-
-```bash
 cd access_log_size
-```
-
-Copy the script to `/LDAP`:
-
-```bash
+sudo mkdir -p /LDAP
 sudo cp scripts/access_size_check.sh /LDAP/access_size_check.sh
-```
-
-Set execute permission:
-
-```bash
 sudo chmod +x /LDAP/access_size_check.sh
-```
-
-Check the Bash syntax:
-
-```bash
 bash -n /LDAP/access_size_check.sh
 ```
 
-No output means the syntax is valid.
+Set `LOG_DIR` and `SAVE_DIR` for the target server before running the script.
 
-## Crontab Configuration
+## CSV Output
 
-Open the Crontab editor:
+Results are appended to:
+
+```text
+/LDAP/size/YYMM_hostname.csv
+```
+
+Example:
+
+```csv
+DATE,HOSTNAME,SIZE_MB,LOG_COUNT
+261024,ldap01,0,0
+261025,ldap01,40,1
+261026,ldap01,200,5
+```
+
+| Column | Description |
+|---|---|
+| `DATE` | Previous day's date in `YYMMDD` format |
+| `HOSTNAME` | Short hostname from `hostname -s` |
+| `SIZE_MB` | Total size in integer MiB |
+| `LOG_COUNT` | Number of matching files that pass the regular-file check |
+
+`SIZE_MB` uses 1,048,576 bytes per MiB. File sizes are added before the fractional part is discarded. A total below 1 MiB is recorded as `0`.
+
+`LOG_COUNT` includes files whose size check fails.
+
+Running the script again appends another row for the same date.
+
+### Updating from the Three-Column Version
+
+The new CSV adds `LOG_COUNT` as the fourth column.
+
+Existing CSV headers and old rows are not updated automatically. Preserve the old CSV separately before starting a new four-column CSV. Old records have no recorded file count; missing counts should not be treated as zero.
+
+## Diagnostic Log
+
+Diagnostic records are appended to:
+
+```text
+/LDAP/size/YYMM_hostname.log
+```
+
+Both output filenames use the previous day's year and month. Each run is identified by its process ID (`pid`).
+
+| Record | Description |
+|---|---|
+| `START / END` | Run start and end |
+| `PATH` | Search pattern and CSV path |
+| `READ / FILE` | File checked and size in bytes |
+| `TOTAL` | File count, size check errors, and total size |
+| `CSV_OK` | CSV row successfully written |
+| `WARN / ERROR / SKIP` | Warnings, failures, and skipped paths |
+| `CLEANUP_OK` | Previous-year CSV and diagnostic log cleanup completed |
+
+Example:
+
+```text
+pid=1234 READ file=/LDAP/log/access.20261026-120000
+pid=1234 FILE bytes=41943040 file=/LDAP/log/access.20261026-120000
+pid=1234 TOTAL files=1 stat_errors=0 bytes=41943040 size_mb=40
+pid=1234 CSV_OK row=261026,ldap01,40,1 file=/LDAP/size/2610_ldap01.csv
+```
+
+`CSV_OK` confirms the row was written. It does not confirm that every expected file was collected.
+
+Missing files or failed size checks may produce zero or partial totals. Check `TOTAL`, `WARN`, `ERROR`, and `SKIP` when investigating a result.
+
+## Scheduled Execution
+
+Open the crontab for the account that will run the script:
 
 ```bash
 crontab -e
 ```
 
-Run the script once a day at the preferred time.
-
-The following example runs the script every day at 04:00:
+Example: run daily at 23:00.
 
 ```cron
-0 4 * * * /LDAP/access_size_check.sh
+0 23 * * * /LDAP/access_size_check.sh
 ```
 
-The script processes the previous day's rotated access logs, so it can run at any preferred time on the following day.
-
-Change `/LDAP/access_size_check.sh` if the script is installed in a different directory.
-
-Verify the registered Crontab:
+Verify the entry:
 
 ```bash
 crontab -l
 ```
 
-## Daily Processing
+Choose the execution time based on the server's log rotation policy. The example time does not guarantee that all previous-day files have finished rotating.
 
-The script performs the following steps:
-
-1. Gets the server hostname
-2. Calculates the previous day's date
-3. Finds the previous day's rotated access logs
-4. Adds all matching file sizes in bytes
-5. Converts the total size to integer MB
-6. Creates the monthly CSV file if it does not exist
-7. Appends the date, hostname, and size to the CSV file
-
-Example:
-
-```text
-Script execution date: 2026-09-02
-Processed log date:    2026-09-01
-Log filename pattern:  access.20260901-*
-CSV filename:          2609_ldap01.csv
-CSV record:            260901,ldap01,10000
-```
-
-## Monthly File Creation
-
-When the processed log month changes, the script automatically creates a new CSV file.
-
-Example:
-
-```text
-2609_ldap01.csv
-2610_ldap01.csv
-```
-
-The September results are stored in `2609_ldap01.csv`, and the October results are stored in `2610_ldap01.csv`.
+If changing an existing schedule, replace its entry to avoid running the script twice.
 
 ## Yearly Cleanup
 
-On January 2, the script deletes CSV files created during the previous year for the current hostname.
+When the script reaches the cleanup step on January 2, it deletes the previous year's monthly CSV and diagnostic log files for the current hostname from `SAVE_DIR`.
 
-January 2 is used because the January 1 execution processes the previous year's December 31 access logs.
+January 1 still processes December 31, so cleanup takes place on January 2.
 
-Example files before cleanup:
-
-```text
-2609_ldap01.csv
-2610_ldap01.csv
-2701_ldap01.csv
-```
-
-After the script runs on January 2, 2027:
-
-```text
-2701_ldap01.csv
-```
-
-The following files are deleted:
-
-```text
-2609_ldap01.csv
-2610_ldap01.csv
-```
-
-## Requirements
-
-- Linux
-- Bash
-- GNU Coreutils
-- Cron or Crond
-- Read permission for the LDAP access log directory
-- Write permission for the CSV output directory
-
-The script uses GNU commands including:
-
-```text
-date -d
-stat -c
-```
-
-## Quick Setup
-
-```bash
-git clone https://github.com/prisma77/access_log_size.git
-```
-
-```bash
-cd access_log_size
-```
-
-```bash
-sudo cp scripts/access_size_check.sh /LDAP/access_size_check.sh
-```
-
-```bash
-sudo chmod +x /LDAP/access_size_check.sh
-```
-
-```bash
-crontab -e
-```
-
-Example schedule:
-
-```cron
-0 4 * * * /LDAP/access_size_check.sh
-```
-
-Verify the schedule:
-
-```bash
-crontab -l
-```
-
-## License
-
-This project is provided for system monitoring and administrative use.
+Raw access logs are not deleted by this script.

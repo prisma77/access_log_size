@@ -139,8 +139,8 @@ If changing an existing schedule, replace its entry to avoid running the script 
 
 ## Yearly Cleanup
 
-When the script reaches the cleanup step on January 2, it deletes the previous year's monthly CSV and diagnostic log files for the current hostname from `SAVE_DIR`.
+When the script reaches the cleanup step on February 1, it deletes the previous year's monthly CSV and diagnostic log files for the current hostname from `SAVE_DIR`.
 
-January 1 still processes December 31, so cleanup takes place on January 2.
+February 1 processes January 31, so cleanup takes place on February 1.
 
 Raw access logs are not deleted by this script.

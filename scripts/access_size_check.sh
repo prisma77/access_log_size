@@ -87,8 +87,8 @@ else
     exit 1
 fi
 
-# delete previous year CSV and script logs on January 2
-if [ "$(date +%m%d)" = "0102" ]; then
+# delete previous year CSV and script logs on February 1
+if [ "$(date +%m%d)" = "0201" ]; then
     PREVIOUS_YEAR=$(date -d "1 year ago" +%y)
     if find "$SAVE_DIR" -maxdepth 1 -type f \( -name "${PREVIOUS_YEAR}[0-1][0-9]_${HOST_NAME}.csv" -o -name "${PREVIOUS_YEAR}[0-1][0-9]_${HOST_NAME}.log" \) -delete; then
         log "CLEANUP_OK previous_year=$PREVIOUS_YEAR"

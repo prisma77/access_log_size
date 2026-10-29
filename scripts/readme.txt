@@ -50,7 +50,7 @@ Change LOG_DIR and SAVE_DIR for another environment.
 
 6. Cleanup
 
-Delete the previous year CSV files and log files on January 2.
+Delete the previous year CSV files and log files on February 1.
 
 
 7. Script Log

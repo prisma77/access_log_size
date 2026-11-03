@@ -50,12 +50,22 @@ Change LOG_DIR and SAVE_DIR for another environment.
 
 6. Cleanup
 
-Delete the previous year CSV files and log files on February 1.
+Each run deletes the same month's CSV and log from the previous year.
+Only files for the current hostname in SAVE_DIR are selected.
+The target month uses the execution date, not yesterday's date.
+
+Example:
+  Run in November 2026:
+    Delete 2511_hostname.csv and 2511_hostname.log.
+
+Missing files are skipped without error.
+Other older months are not removed by this cleanup.
+Raw access logs are not deleted.
 
 
 7. Script Log
 
-Save results to a monthly log file
+Save results to a monthly log file.
 YYMM uses yesterday's year and month.
 Each run shows its process ID (PID).
 
@@ -65,16 +75,20 @@ Each run shows its process ID (PID).
   TOTAL       : File count, size check errors and total size.
   CSV_OK      : Data saved to the CSV file.
   WARN / ERROR / SKIP : Warnings, errors and skipped files.
-  CLEANUP_OK  : Old CSV file cleanup finished.
+  CLEANUP_OK  : Cleanup command finished without error.
 
 CSV_OK means the CSV was saved. Check TOTAL and errors.
 If files are missing or size checks fail, the CSV may show 0 or a smaller total.
+
+CLEANUP_OK is recorded even when the target files do not exist.
+The month value shows the cleanup target in YYMM format.
 
 Example:
 pid=7477 READ file=/LDAP/log/access.20261020-235500
 pid=7477 FILE bytes=43407906 file=/LDAP/log/access.20261020-235500
 pid=7477 TOTAL files=288 stat_errors=0 bytes=12087648912 size_mb=11527
 pid=7477 CSV_OK row=261020,2021dsldap01,11527,288 file=/LDAP/size/2610_2021dsldap01.csv
+pid=7477 CLEANUP_OK month=2510
 pid=7477 END time=2026-10-21 16:28:02 +0900 files=288 stat_errors=0
 
 ==========================

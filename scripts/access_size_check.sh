@@ -87,15 +87,17 @@ else
     exit 1
 fi
 
-# delete previous year CSV and script logs on February 1
-if [ "$(date +%m%d)" = "0201" ]; then
-    PREVIOUS_YEAR=$(date -d "1 year ago" +%y)
-    if find "$SAVE_DIR" -maxdepth 1 -type f \( -name "${PREVIOUS_YEAR}[0-1][0-9]_${HOST_NAME}.csv" -o -name "${PREVIOUS_YEAR}[0-1][0-9]_${HOST_NAME}.log" \) -delete; then
-        log "CLEANUP_OK previous_year=$PREVIOUS_YEAR"
-    else
-        log "ERROR cleanup_failed previous_year=$PREVIOUS_YEAR"
-        exit 1
-    fi
+# delete the same month's CSV and script log from the previous year
+if ! DELETE_MONTH=$(date -d "$(date +%Y-%m-01) -1 year" +%y%m); then
+    log "ERROR cleanup_date_failed"
+    exit 1
+fi
+
+if rm -f -- "${SAVE_DIR}/${DELETE_MONTH}_${HOST_NAME}.csv" "${SAVE_DIR}/${DELETE_MONTH}_${HOST_NAME}.log"; then
+    log "CLEANUP_OK month=$DELETE_MONTH"
+else
+    log "ERROR cleanup_failed month=$DELETE_MONTH"
+    exit 1
 fi
 
 log "END time=$(date '+%F %T %z') files=$FILE_COUNT stat_errors=$STAT_ERRORS"

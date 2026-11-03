@@ -7,10 +7,10 @@ Diagnostic logs record the files checked, collected sizes, and errors.
 ## Requirements
 
 - Linux with Bash
-- GNU Coreutils and GNU Findutils
+- GNU Coreutils
 - Cron for scheduled execution
 - Permission to list and access the log directory
-- Write permission for the output directory
+- Permission to create, write, and delete files in the output directory
 
 ## Configuration
 
@@ -98,7 +98,7 @@ Both output filenames use the previous day's year and month. Each run is identif
 | `TOTAL` | File count, size check errors, and total size |
 | `CSV_OK` | CSV row successfully written |
 | `WARN / ERROR / SKIP` | Warnings, failures, and skipped paths |
-| `CLEANUP_OK` | Previous-year CSV and diagnostic log cleanup completed |
+| `CLEANUP_OK` | Cleanup command completed without error, including when target files were absent |
 
 Example:
 
@@ -107,11 +107,14 @@ pid=1234 READ file=/LDAP/log/access.20261026-120000
 pid=1234 FILE bytes=41943040 file=/LDAP/log/access.20261026-120000
 pid=1234 TOTAL files=1 stat_errors=0 bytes=41943040 size_mb=40
 pid=1234 CSV_OK row=261026,ldap01,40,1 file=/LDAP/size/2610_ldap01.csv
+pid=1234 CLEANUP_OK month=2510
 ```
 
 `CSV_OK` confirms the row was written. It does not confirm that every expected file was collected.
 
 Missing files or failed size checks may produce zero or partial totals. Check `TOTAL`, `WARN`, `ERROR`, and `SKIP` when investigating a result.
+
+`CLEANUP_OK` does not mean that files were actually deleted. The `month` value identifies the cleanup target in `YYMM` format.
 
 ## Scheduled Execution
 
@@ -137,10 +140,24 @@ Choose the execution time based on the server's log rotation policy. The example
 
 If changing an existing schedule, replace its entry to avoid running the script twice.
 
-## Yearly Cleanup
+## Cleanup
 
-When the script reaches the cleanup step on February 1, it deletes the previous year's monthly CSV and diagnostic log files for the current hostname from `SAVE_DIR`.
+Each run that reaches the cleanup step deletes the same month's CSV and diagnostic log from the previous year for the current hostname in `SAVE_DIR`.
 
-February 1 processes January 31, so cleanup takes place on February 1.
+The target month is calculated from the execution date, not the previous day's collection date.
+
+| Execution month | Target files |
+|---|---|
+| November 2026 | `2511_hostname.csv` and `2511_hostname.log` |
+| December 2026 | `2512_hostname.csv` and `2512_hostname.log` |
+| January 2027 | `2601_hostname.csv` and `2601_hostname.log` |
+
+Cleanup runs every day, not only on the first day of the month. If the target files were already deleted, `rm -f` completes without error and `CLEANUP_OK` is still recorded.
+
+This is month-based cleanup. Entire monthly files are deleted; individual records are not retained for exactly one year.
+
+Only the target month is checked. Other older files, including files missed during a full month without execution, are not removed by this cleanup.
+
+If the cleanup date calculation or deletion command fails, the script logs an error and exits with status `1`.
 
 Raw access logs are not deleted by this script.
